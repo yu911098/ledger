@@ -233,7 +233,7 @@
             <label>類型</label>
             <div class="type-toggle">
               <button class="type-btn active-expense" id="btn-expense">支出</button>
-              <button class="type-btn" id="btn-income">進帳</button>
+              <button class="type-btn" id="btn-income">收入</button>
             </div>
           </div>
           <div class="form-group"><label>金額（元）</label><input type="number" id="amount" placeholder="0" min="0" step="1"></div>
@@ -247,7 +247,7 @@
             </div>
           </div>
           <div id="income-section" style="display:none">
-            <div class="form-group"><label>進帳方式</label><div class="payment-grid" id="income-chips"></div></div>
+            <div class="form-group"><label>收入方式</label><div class="payment-grid" id="income-chips"></div></div>
           </div>
           <button class="submit-btn" id="submit-btn">記 帳</button>
         </div>
@@ -314,7 +314,7 @@
         <label>類型</label>
         <div class="type-toggle">
           <button class="type-btn" id="edit-btn-expense">支出</button>
-          <button class="type-btn" id="edit-btn-income">進帳</button>
+          <button class="type-btn" id="edit-btn-income">收入</button>
         </div>
       </div>
       <div class="form-group"><label>金額（元）</label><input type="number" id="edit-amount" placeholder="0" min="0" step="1"></div>
@@ -328,7 +328,7 @@
         </div>
       </div>
       <div id="edit-income-section" style="display:none">
-        <div class="form-group"><label>進帳方式</label><div class="payment-grid" id="edit-income-chips"></div></div>
+        <div class="form-group"><label>收入方式</label><div class="payment-grid" id="edit-income-chips"></div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -360,11 +360,11 @@ const db = getFirestore(app);
 const EXPENSE_PAYS = [
   { id:'cash', label:'現金' },
   { id:'card', label:'刷卡' },
-  { id:'applepay', label:'Apple Pay' },
+  { id:'transfer', label:'轉帳' },
 ];
 const INCOME_PAYS = [
-  { id:'transfer', label:'轉帳' },
   { id:'salary', label:'薪水' },
+  { id:'transfer_in', label:'轉帳' },
 ];
 
 // ── State ──────────────────────────────────────────────────────────────
@@ -515,14 +515,14 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const date = document.getElementById('rec-date').value;
   if (!amount||amount<=0) return showToast('請輸入有效金額');
   if (!date) return showToast('請選擇日期');
-  if (!selectedPay) return showToast('請選擇付款/進帳方式');
+  if (!selectedPay) return showToast('請選擇付款/收入方式');
   const payLabel = buildPayLabel(currentType, selectedPay,
     document.getElementById('card-bank').value.trim(),
     document.getElementById('card-last4').value.trim());
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   try {
-    await fsAdd({ type:currentType, amount, desc:desc||(currentType==='expense'?'支出':'進帳'), date, pay:payLabel, createdAt:Date.now() });
+    await fsAdd({ type:currentType, amount, desc:desc||(currentType==='expense'?'支出':'收入'), date, pay:payLabel, createdAt:Date.now() });
     document.getElementById('amount').value='';
     document.getElementById('desc').value='';
     selectedPay='';
@@ -687,12 +687,12 @@ async function saveEdit() {
   const date = document.getElementById('edit-date').value;
   if (!amount||amount<=0) return showToast('請輸入有效金額');
   if (!date) return showToast('請選擇日期');
-  if (!editSelectedPay) return showToast('請選擇付款/進帳方式');
+  if (!editSelectedPay) return showToast('請選擇付款/收入方式');
   const payLabel = buildPayLabel(editType, editSelectedPay,
     document.getElementById('edit-card-bank').value.trim(),
     document.getElementById('edit-card-last4').value.trim());
   try {
-    await fsUpdate(id, { type:editType, amount, desc:desc||(editType==='expense'?'支出':'進帳'), date, pay:payLabel });
+    await fsUpdate(id, { type:editType, amount, desc:desc||(editType==='expense'?'支出':'收入'), date, pay:payLabel });
     closeEditModal(); showToast('已更新 ✓');
   } catch(e) { showToast('更新失敗'); }
 }
