@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>記帳本</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1209;
+    --ink-soft: #4a3f2f;
+    --ink-muted: #8a7a65;
+    --paper: #f5f0e8;
+    --paper-warm: #ede5d4;
+    --paper-dark: #d9cebc;
+    --red: #c0392b;
+    --green: #27604a;
+    --gold: #b8860b;
+    --accent: #8b4513;
+    --shadow: rgba(26,18,9,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: #2c2416;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(255,255,255,0.04) 29px, rgba(255,255,255,0.04) 30px),
+      repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(255,255,255,0.04) 29px, rgba(255,255,255,0.04) 30px);
+  }
+
+  /* Login */
+  #login-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+  }
+  .login-card {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 48px 44px;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+    max-width: 340px;
+    width: 100%;
+  }
+  .login-card::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:linear-gradient(90deg,var(--accent),var(--gold)); }
+  .login-title { font-family:'Noto Serif TC',serif; font-size:2rem; font-weight:700; letter-spacing:0.3em; color:var(--ink); margin-bottom:8px; }
+  .login-sub { font-size:0.78rem; color:var(--ink-muted); letter-spacing:0.1em; margin-bottom:36px; }
+  .google-btn {
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    width:100%; padding:12px 20px;
+    background:white; border:1px solid var(--paper-dark); border-radius:3px;
+    cursor:pointer; font-family:'Noto Sans TC',sans-serif; font-size:0.9rem; color:var(--ink-soft);
+    transition:all 0.2s; box-shadow:0 2px 6px rgba(0,0,0,0.08);
+  }
+  .google-btn:hover { box-shadow:0 4px 12px rgba(0,0,0,0.15); transform:translateY(-1px); }
+
+  /* App */
+  #app-screen { display:none; width:100%; max-width:1100px; }
+
+  header { text-align:center; margin-bottom:28px; color:var(--paper); width:100%; }
+  header h1 { font-family:'Noto Serif TC',serif; font-size:2.2rem; font-weight:700; letter-spacing:0.25em; color:#e8dcc8; text-shadow:0 2px 8px rgba(0,0,0,0.4); }
+  header p { font-size:0.78rem; color:#a09070; letter-spacing:0.15em; margin-top:4px; }
+
+  .user-bar { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .user-avatar { width:26px; height:26px; border-radius:50%; border:1px solid rgba(255,255,255,0.2); }
+  .user-name { font-size:0.75rem; color:#a09070; }
+  .sync-indicator { font-size:0.65rem; color:#a09070; display:flex; align-items:center; gap:4px; }
+  .sync-dot { width:6px; height:6px; border-radius:50%; background:var(--green); transition:background 0.3s; }
+  .sync-dot.syncing { background:var(--gold); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .sign-out-btn { background:none; border:1px solid rgba(255,255,255,0.15); border-radius:3px; color:#a09070; font-size:0.68rem; padding:3px 8px; cursor:pointer; font-family:'Noto Sans TC',sans-serif; letter-spacing:0.05em; transition:all 0.15s; }
+  .sign-out-btn:hover { border-color:rgba(255,255,255,0.3); color:#c8b898; }
+
+  .main-grid { display:grid; grid-template-columns:380px 1fr; gap:20px; width:100%; }
+
+  .card { background:var(--paper); border-radius:4px; box-shadow:0 4px 24px var(--shadow),0 1px 0 rgba(255,255,255,0.6) inset; overflow:hidden; position:relative; }
+  .card::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:linear-gradient(90deg,var(--accent),var(--gold)); }
+  .card-header { padding:18px 22px 14px; border-bottom:1px solid var(--paper-dark); display:flex; align-items:center; gap:10px; }
+  .card-header h2 { font-family:'Noto Serif TC',serif; font-size:1rem; font-weight:600; color:var(--ink); letter-spacing:0.1em; }
+  .card-icon { width:28px;height:28px; border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:14px; background:var(--paper-warm); }
+
+  .form-body { padding:20px 22px; }
+  .form-group { margin-bottom:16px; }
+  label { display:block; font-size:0.72rem; font-weight:500; color:var(--ink-muted); letter-spacing:0.12em; margin-bottom:6px; text-transform:uppercase; }
+  input, select { width:100%; padding:9px 12px; border:1px solid var(--paper-dark); border-radius:3px; background:var(--paper-warm); color:var(--ink); font-family:'Noto Sans TC',sans-serif; font-size:0.88rem; transition:border-color 0.2s,box-shadow 0.2s; outline:none; appearance:none; }
+  input:focus, select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(139,69,19,0.12); background:#fff; }
+  input[type="number"] { font-family:'DM Mono',monospace; font-size:1.1rem; font-weight:500; }
+
+  .type-toggle { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--paper-dark); border-radius:3px; overflow:hidden; }
+  .type-btn { padding:9px; text-align:center; cursor:pointer; font-size:0.82rem; font-weight:500; letter-spacing:0.08em; transition:all 0.18s; border:none; background:var(--paper-warm); color:var(--ink-muted); font-family:'Noto Sans TC',sans-serif; }
+  .type-btn.active-expense { background:var(--red); color:white; }
+  .type-btn.active-income { background:var(--green); color:white; }
+  .type-btn:first-child { border-right:1px solid var(--paper-dark); }
+
+  .payment-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .pay-chip { padding:7px 4px; text-align:center; border:1px solid var(--paper-dark); border-radius:3px; cursor:pointer; font-size:0.72rem; font-weight:500; color:var(--ink-soft); background:var(--paper-warm); transition:all 0.15s; letter-spacing:0.04em; }
+  .pay-chip.selected { background:var(--accent); color:white; border-color:var(--accent); }
+
+  .card-input-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  #card-detail-group { display:none; }
+
+  .submit-btn { width:100%; padding:12px; background:var(--ink); color:var(--paper); border:none; border-radius:3px; font-family:'Noto Serif TC',serif; font-size:0.95rem; font-weight:600; letter-spacing:0.2em; cursor:pointer; transition:all 0.2s; margin-top:4px; }
+  .submit-btn:hover { background:var(--accent); transform:translateY(-1px); box-shadow:0 4px 12px rgba(139,69,19,0.3); }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  .right-col { display:flex; flex-direction:column; gap:20px; }
+  .summary-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .summary-card { background:var(--paper); border-radius:4px; padding:18px 20px; box-shadow:0 4px 24px var(--shadow); }
+  .summary-label { font-size:0.7rem; color:var(--ink-muted); letter-spacing:0.15em; text-transform:uppercase; margin-bottom:8px; }
+  .summary-date { font-size:0.75rem; color:var(--ink-muted); font-family:'DM Mono',monospace; margin-bottom:12px; }
+  .summary-net { font-family:'DM Mono',monospace; font-size:1.6rem; font-weight:500; color:var(--ink); margin-bottom:10px; }
+  .summary-net.positive { color:var(--green); }
+  .summary-net.negative { color:var(--red); }
+  .summary-breakdown { display:flex; gap:14px; font-size:0.72rem; font-family:'DM Mono',monospace; }
+  .breakdown-in { color:var(--green); }
+  .breakdown-out { color:var(--red); }
+
+  .date-nav { display:flex; align-items:center; gap:10px; padding:14px 22px; border-bottom:1px solid var(--paper-dark); }
+  .date-nav button { background:var(--paper-warm); border:1px solid var(--paper-dark); border-radius:3px; width:28px;height:28px; cursor:pointer; font-size:14px; color:var(--ink-soft); display:flex;align-items:center;justify-content:center; transition:all 0.15s; }
+  .date-nav button:hover { background:var(--paper-dark); }
+  .date-nav .date-label { font-family:'DM Mono',monospace; font-size:0.82rem; color:var(--ink-soft); flex:1; letter-spacing:0.05em; }
+
+  .ledger-body { padding:8px 0; max-height:480px; overflow-y:auto; }
+  .ledger-body::-webkit-scrollbar { width:4px; }
+  .ledger-body::-webkit-scrollbar-thumb { background:var(--paper-dark); border-radius:2px; }
+
+  .ledger-row { padding:10px 22px; display:flex; align-items:center; gap:12px; border-top:1px solid transparent; transition:background 0.12s; }
+  .ledger-row:hover { background:var(--paper-warm); }
+  .ledger-row+.ledger-row { border-top-color:rgba(0,0,0,0.04); }
+  .ledger-dot { width:8px;height:8px; border-radius:50%; flex-shrink:0; }
+  .dot-expense { background:var(--red); }
+  .dot-income { background:var(--green); }
+  .ledger-desc { flex:1; font-size:0.85rem; color:var(--ink); }
+  .ledger-pay-badge { font-size:0.62rem; padding:2px 7px; border-radius:2px; background:var(--paper-warm); color:var(--ink-muted); border:1px solid var(--paper-dark); white-space:nowrap; font-family:'DM Mono',monospace; }
+  .ledger-amount { font-family:'DM Mono',monospace; font-size:0.92rem; font-weight:500; min-width:80px; text-align:right; }
+  .amount-expense { color:var(--red); }
+  .amount-income { color:var(--green); }
+  .ledger-edit { background:none; border:none; color:var(--paper-dark); cursor:pointer; font-size:13px; padding:0 2px; transition:color 0.15s; }
+  .ledger-edit:hover { color:var(--gold); }
+  .ledger-del { background:none; border:none; color:var(--paper-dark); cursor:pointer; font-size:14px; padding:0 2px; transition:color 0.15s; }
+  .ledger-del:hover { color:var(--red); }
+
+  .empty-state { padding:40px 22px; text-align:center; color:var(--ink-muted); font-size:0.82rem; letter-spacing:0.08em; }
+  .empty-state span { display:block; font-size:1.8rem; margin-bottom:10px; opacity:0.4; }
+
+  .tab-row { display:flex; border-bottom:1px solid var(--paper-dark); }
+  .tab-btn { padding:12px 20px; border:none; background:transparent; font-family:'Noto Sans TC',sans-serif; font-size:0.78rem; letter-spacing:0.1em; color:var(--ink-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all 0.15s; }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:500; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  .month-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+  .month-table th { padding:8px 22px; text-align:left; font-size:0.65rem; color:var(--ink-muted); letter-spacing:0.1em; text-transform:uppercase; border-bottom:1px solid var(--paper-dark); font-weight:500; }
+  .month-table th:last-child,.month-table td:last-child { text-align:right; padding-right:22px; }
+  .month-table td { padding:10px 22px; color:var(--ink); border-bottom:1px solid rgba(0,0,0,0.04); font-family:'DM Mono',monospace; font-size:0.8rem; }
+  .month-table tr:last-child td { border-bottom:none; }
+  .month-table td:first-child { font-family:'Noto Sans TC',sans-serif; font-size:0.82rem; }
+  .month-table .total-row td { font-weight:600; border-top:1px solid var(--paper-dark); padding-top:12px; }
+
+  /* Modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(26,18,9,0.6); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--paper); border-radius:4px; width:100%; max-width:420px; margin:16px; box-shadow:0 16px 48px rgba(0,0,0,0.3); position:relative; overflow:hidden; animation:modalIn 0.2s ease; }
+  @keyframes modalIn { from{opacity:0;transform:translateY(12px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+  .modal::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:linear-gradient(90deg,var(--gold),var(--accent)); }
+  .modal-header { padding:18px 22px 14px; border-bottom:1px solid var(--paper-dark); display:flex; align-items:center; justify-content:space-between; }
+  .modal-header h3 { font-family:'Noto Serif TC',serif; font-size:1rem; font-weight:600; color:var(--ink); letter-spacing:0.1em; }
+  .modal-close { background:none; border:none; font-size:18px; color:var(--ink-muted); cursor:pointer; transition:color 0.15s; }
+  .modal-close:hover { color:var(--red); }
+  .modal-body { padding:20px 22px; }
+  .modal-footer { padding:0 22px 20px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .btn-cancel { padding:10px; background:var(--paper-warm); border:1px solid var(--paper-dark); border-radius:3px; font-family:'Noto Sans TC',sans-serif; font-size:0.85rem; color:var(--ink-soft); cursor:pointer; transition:all 0.15s; letter-spacing:0.08em; }
+  .btn-cancel:hover { background:var(--paper-dark); }
+  .btn-save { padding:10px; background:var(--accent); border:none; border-radius:3px; font-family:'Noto Serif TC',serif; font-size:0.9rem; font-weight:600; color:white; cursor:pointer; transition:all 0.15s; letter-spacing:0.15em; }
+  .btn-save:hover { background:var(--ink); transform:translateY(-1px); }
+  #modal-card-detail { display:none; }
+
+  select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a7a65'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:30px; }
+
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(60px); background:var(--ink); color:var(--paper); padding:10px 20px; border-radius:3px; font-size:0.82rem; letter-spacing:0.06em; transition:transform 0.3s ease; z-index:99; pointer-events:none; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:800px) { .main-grid { grid-template-columns:1fr; } .summary-row { grid-template-columns:1fr 1fr; } }
+  @media (max-width:480px) { .summary-row { grid-template-columns:1fr; } .payment-grid { grid-template-columns:repeat(2,1fr); } }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-title">記 帳 本</div>
+    <div class="login-sub">登入以在所有裝置同步資料</div>
+    <button class="google-btn" id="google-login-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      使用 Google 帳號登入
+    </button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app-screen">
+  <header>
+    <h1>記 帳 本</h1>
+    <p id="header-date"></p>
+    <div class="user-bar">
+      <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none">
+      <span class="user-name" id="user-name"></span>
+      <div class="sync-indicator">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">已同步</span>
+      </div>
+      <button class="sign-out-btn" id="sign-out-btn">登出</button>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon">✍️</div><h2>新增記錄</h2></div>
+        <div class="form-body">
+          <div class="form-group">
+            <label>類型</label>
+            <div class="type-toggle">
+              <button class="type-btn active-expense" id="btn-expense">支出</button>
+              <button class="type-btn" id="btn-income">進帳</button>
+            </div>
+          </div>
+          <div class="form-group"><label>金額（元）</label><input type="number" id="amount" placeholder="0" min="0" step="1"></div>
+          <div class="form-group"><label>說明</label><input type="text" id="desc" placeholder="例：午餐、超市購物…"></div>
+          <div class="form-group"><label>日期</label><input type="date" id="rec-date"></div>
+          <div id="payment-section">
+            <div class="form-group"><label>付款方式</label><div class="payment-grid" id="pay-chips"></div></div>
+            <div class="form-group card-input-row" id="card-detail-group">
+              <div><label>發卡銀行</label><input type="text" id="card-bank" placeholder="例：國泰世華"></div>
+              <div><label>卡末四碼</label><input type="text" id="card-last4" maxlength="4" placeholder="1234"></div>
+            </div>
+          </div>
+          <div id="income-section" style="display:none">
+            <div class="form-group"><label>進帳方式</label><div class="payment-grid" id="income-chips"></div></div>
+          </div>
+          <button class="submit-btn" id="submit-btn">記 帳</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-col">
+      <div class="summary-row">
+        <div class="summary-card">
+          <div class="summary-label">今日結算</div>
+          <div class="summary-date" id="daily-date"></div>
+          <div class="summary-net" id="daily-net">$0</div>
+          <div class="summary-breakdown"><span class="breakdown-in" id="daily-in">▲ $0</span><span class="breakdown-out" id="daily-out">▼ $0</span></div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">本月結算</div>
+          <div class="summary-date" id="monthly-date"></div>
+          <div class="summary-net" id="monthly-net">$0</div>
+          <div class="summary-breakdown"><span class="breakdown-in" id="monthly-in">▲ $0</span><span class="breakdown-out" id="monthly-out">▼ $0</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="tab-row">
+          <button class="tab-btn active" data-tab="daily-tab">明細帳</button>
+          <button class="tab-btn" data-tab="monthly-tab">月報表</button>
+        </div>
+        <div class="tab-content active" id="daily-tab">
+          <div class="date-nav">
+            <button id="prev-day">‹</button>
+            <span class="date-label" id="view-date-label"></span>
+            <button id="next-day">›</button>
+            <button id="today-btn" style="font-size:10px;padding:0 6px;width:auto;letter-spacing:0.05em;">今日</button>
+          </div>
+          <div class="ledger-body" id="ledger-body"></div>
+        </div>
+        <div class="tab-content" id="monthly-tab">
+          <div class="date-nav">
+            <button id="prev-month">‹</button>
+            <span class="date-label" id="view-month-label"></span>
+            <button id="next-month">›</button>
+          </div>
+          <div style="overflow-x:auto;max-height:480px;overflow-y:auto">
+            <table class="month-table">
+              <thead><tr><th>日期</th><th>說明</th><th>方式</th><th>金額</th></tr></thead>
+              <tbody id="month-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header"><h3>編輯記錄</h3><button class="modal-close" id="modal-close-btn">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-group">
+        <label>類型</label>
+        <div class="type-toggle">
+          <button class="type-btn" id="edit-btn-expense">支出</button>
+          <button class="type-btn" id="edit-btn-income">進帳</button>
+        </div>
+      </div>
+      <div class="form-group"><label>金額（元）</label><input type="number" id="edit-amount" placeholder="0" min="0" step="1"></div>
+      <div class="form-group"><label>說明</label><input type="text" id="edit-desc"></div>
+      <div class="form-group"><label>日期</label><input type="date" id="edit-date"></div>
+      <div id="edit-payment-section">
+        <div class="form-group"><label>付款方式</label><div class="payment-grid" id="edit-pay-chips"></div></div>
+        <div class="form-group card-input-row" id="modal-card-detail">
+          <div><label>發卡銀行</label><input type="text" id="edit-card-bank" placeholder="例：國泰世華"></div>
+          <div><label>卡末四碼</label><input type="text" id="edit-card-last4" maxlength="4" placeholder="1234"></div>
+        </div>
+      </div>
+      <div id="edit-income-section" style="display:none">
+        <div class="form-group"><label>進帳方式</label><div class="payment-grid" id="edit-income-chips"></div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="modal-cancel-btn">取 消</button>
+      <button class="btn-save" id="modal-save-btn">儲 存</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCRKxvfaqB98pxJ9zo_OE1dE6OLUk-htvA",
+  authDomain: "my-ledger-167e8.firebaseapp.com",
+  projectId: "my-ledger-167e8",
+  storageBucket: "my-ledger-167e8.firebasestorage.app",
+  messagingSenderId: "204499380484",
+  appId: "1:204499380484:web:a870355040807ba9218851"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── Constants ──────────────────────────────────────────────────────────
+const EXPENSE_PAYS = [
+  { id:'cash', label:'現金' },
+  { id:'card', label:'刷卡' },
+  { id:'applepay', label:'Apple Pay' },
+];
+const INCOME_PAYS = [
+  { id:'transfer', label:'轉帳' },
+  { id:'salary', label:'薪水' },
+];
+
+// ── State ──────────────────────────────────────────────────────────────
+let currentUser = null;
+let unsubscribeFs = null;
+let records = [];
+let currentType = 'expense';
+let selectedPay = '';
+let viewDate = todayStr();
+let viewMonth = todayStr().slice(0,7);
+let editType = 'expense';
+let editSelectedPay = '';
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function formatDate(s) {
+  const [y,m,d] = s.split('-');
+  return `${y}年${parseInt(m)}月${parseInt(d)}日`;
+}
+function formatMoney(n) { return '$'+Math.abs(n).toLocaleString(); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setSyncing(v) {
+  document.getElementById('sync-dot').className = 'sync-dot'+(v?' syncing':'');
+  document.getElementById('sync-label').textContent = v ? '同步中…' : '已同步';
+}
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function buildPayLabel(type, payId, bank, last4) {
+  const pays = type==='expense' ? EXPENSE_PAYS : INCOME_PAYS;
+  const p = pays.find(x=>x.id===payId);
+  let label = p ? p.label : '';
+  if (payId==='card') {
+    if (bank) label += ' '+bank;
+    if (last4) label += ' *'+last4;
+  }
+  return label;
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────
+document.getElementById('google-login-btn').addEventListener('click', async () => {
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch(e) { showToast('登入失敗，請再試一次'); }
+});
+
+document.getElementById('sign-out-btn').addEventListener('click', async () => {
+  if (unsubscribeFs) unsubscribeFs();
+  await fbSignOut(auth);
+  records = [];
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+});
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    const av = document.getElementById('user-avatar');
+    if (user.photoURL) { av.src = user.photoURL; av.style.display = ''; }
+    document.getElementById('user-name').textContent = user.displayName || user.email;
+    initApp();
+    subscribeRecords();
+  } else {
+    currentUser = null;
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
+  }
+});
+
+function subscribeRecords() {
+  if (unsubscribeFs) unsubscribeFs();
+  setSyncing(true);
+  const q = query(collection(db, `users/${currentUser.uid}/records`), orderBy('date','desc'));
+  unsubscribeFs = onSnapshot(q, snap => {
+    records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderLedger(); renderMonthTable(); updateSummary();
+    setSyncing(false);
+  }, err => { console.error(err); setSyncing(false); showToast('同步失敗，請檢查網路'); });
+}
+
+// ── Firestore ops ──────────────────────────────────────────────────────
+async function fsAdd(data) {
+  setSyncing(true);
+  return addDoc(collection(db, `users/${currentUser.uid}/records`), data);
+}
+async function fsUpdate(id, data) {
+  setSyncing(true);
+  return updateDoc(doc(db, `users/${currentUser.uid}/records`, id), data);
+}
+async function fsDelete(id) {
+  setSyncing(true);
+  return deleteDoc(doc(db, `users/${currentUser.uid}/records`, id));
+}
+
+// ── Init ───────────────────────────────────────────────────────────────
+function initApp() {
+  const today = todayStr();
+  document.getElementById('rec-date').value = today;
+  document.getElementById('header-date').textContent = formatDate(today);
+  document.getElementById('daily-date').textContent = formatDate(today);
+  document.getElementById('monthly-date').textContent = today.slice(0,7).replace('-','年')+'月';
+  renderPayChips(); updateViewDateLabel(); updateViewMonthLabel();
+}
+
+// ── Type toggle ────────────────────────────────────────────────────────
+document.getElementById('btn-expense').addEventListener('click', () => setType('expense'));
+document.getElementById('btn-income').addEventListener('click', () => setType('income'));
+
+function setType(type) {
+  currentType = type; selectedPay = '';
+  document.getElementById('btn-expense').className = 'type-btn'+(type==='expense'?' active-expense':'');
+  document.getElementById('btn-income').className = 'type-btn'+(type==='income'?' active-income':'');
+  document.getElementById('payment-section').style.display = type==='expense' ? '' : 'none';
+  document.getElementById('income-section').style.display = type==='income' ? '' : 'none';
+  document.getElementById('card-detail-group').style.display = 'none';
+  renderPayChips();
+}
+
+function renderPayChips() {
+  const pays = currentType==='expense' ? EXPENSE_PAYS : INCOME_PAYS;
+  const id = currentType==='expense' ? 'pay-chips' : 'income-chips';
+  document.getElementById(id).innerHTML = pays.map(p =>
+    `<div class="pay-chip${selectedPay===p.id?' selected':''}" data-pay="${p.id}">${p.label}</div>`
+  ).join('');
+  document.getElementById(id).querySelectorAll('.pay-chip').forEach(el => {
+    el.addEventListener('click', () => selectPay(el.dataset.pay));
+  });
+}
+
+function selectPay(id) {
+  selectedPay = id; renderPayChips();
+  document.getElementById('card-detail-group').style.display = id==='card' ? 'grid' : 'none';
+  if (id!=='card') { document.getElementById('card-bank').value=''; document.getElementById('card-last4').value=''; }
+}
+
+// ── Add record ─────────────────────────────────────────────────────────
+document.getElementById('submit-btn').addEventListener('click', async () => {
+  const amount = parseFloat(document.getElementById('amount').value);
+  const desc = document.getElementById('desc').value.trim();
+  const date = document.getElementById('rec-date').value;
+  if (!amount||amount<=0) return showToast('請輸入有效金額');
+  if (!date) return showToast('請選擇日期');
+  if (!selectedPay) return showToast('請選擇付款/進帳方式');
+  const payLabel = buildPayLabel(currentType, selectedPay,
+    document.getElementById('card-bank').value.trim(),
+    document.getElementById('card-last4').value.trim());
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  try {
+    await fsAdd({ type:currentType, amount, desc:desc||(currentType==='expense'?'支出':'進帳'), date, pay:payLabel, createdAt:Date.now() });
+    document.getElementById('amount').value='';
+    document.getElementById('desc').value='';
+    selectedPay='';
+    document.getElementById('card-bank').value='';
+    document.getElementById('card-last4').value='';
+    document.getElementById('card-detail-group').style.display='none';
+    renderPayChips();
+    showToast('已記帳 ✓');
+  } catch(e) { showToast('儲存失敗，請再試'); }
+  btn.disabled = false;
+});
+
+// ── Date nav ───────────────────────────────────────────────────────────
+document.getElementById('prev-day').addEventListener('click', () => changeViewDate(-1));
+document.getElementById('next-day').addEventListener('click', () => changeViewDate(1));
+document.getElementById('today-btn').addEventListener('click', () => { viewDate=todayStr(); updateViewDateLabel(); renderLedger(); });
+document.getElementById('prev-month').addEventListener('click', () => changeViewMonth(-1));
+document.getElementById('next-month').addEventListener('click', () => changeViewMonth(1));
+
+function changeViewDate(d) {
+  const [y,m,day] = viewDate.split('-').map(Number);
+  const dt = new Date(y, m-1, day+d);
+  viewDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  updateViewDateLabel(); renderLedger();
+}
+function changeViewMonth(d) {
+  const [y,m] = viewMonth.split('-').map(Number);
+  const dt = new Date(y, m-1+d, 1);
+  viewMonth = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+  updateViewMonthLabel(); renderMonthTable();
+}
+function updateViewDateLabel() { document.getElementById('view-date-label').textContent = formatDate(viewDate); }
+function updateViewMonthLabel() {
+  const [y,m] = viewMonth.split('-');
+  document.getElementById('view-month-label').textContent = `${y}年${parseInt(m)}月`;
+}
+
+// ── Ledger ─────────────────────────────────────────────────────────────
+function renderLedger() {
+  const body = document.getElementById('ledger-body');
+  const dayRecs = records.filter(r=>r.date===viewDate);
+  if (!dayRecs.length) { body.innerHTML='<div class="empty-state"><span>📒</span>今日尚無記錄</div>'; return; }
+  body.innerHTML = dayRecs.map(r => `
+    <div class="ledger-row">
+      <div class="ledger-dot ${r.type==='expense'?'dot-expense':'dot-income'}"></div>
+      <div class="ledger-desc">${escHtml(r.desc)}</div>
+      <span class="ledger-pay-badge">${escHtml(r.pay)}</span>
+      <div class="ledger-amount ${r.type==='expense'?'amount-expense':'amount-income'}">${r.type==='expense'?'−':'+'}${formatMoney(r.amount)}</div>
+      <button class="ledger-edit" data-id="${r.id}" title="編輯">✎</button>
+      <button class="ledger-del" data-id="${r.id}" title="刪除">×</button>
+    </div>`).join('');
+  body.querySelectorAll('.ledger-edit').forEach(btn => btn.addEventListener('click', () => openEditModal(btn.dataset.id)));
+  body.querySelectorAll('.ledger-del').forEach(btn => btn.addEventListener('click', async () => {
+    try { await fsDelete(btn.dataset.id); showToast('已刪除'); } catch(e) { showToast('刪除失敗'); }
+  }));
+}
+
+// ── Month table ────────────────────────────────────────────────────────
+function renderMonthTable() {
+  const tbody = document.getElementById('month-tbody');
+  const sorted = records.filter(r=>r.date.startsWith(viewMonth)).sort((a,b)=>a.date.localeCompare(b.date));
+  if (!sorted.length) { tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--ink-muted);padding:32px">本月尚無記錄</td></tr>`; return; }
+  let totalIn=0, totalOut=0;
+  const rows = sorted.map(r => {
+    if (r.type==='income') totalIn+=r.amount; else totalOut+=r.amount;
+    const [,mo,dy] = r.date.split('-');
+    return `<tr><td>${parseInt(mo)}/${parseInt(dy)}</td><td style="font-family:'Noto Sans TC',sans-serif">${escHtml(r.desc)}</td><td>${escHtml(r.pay)}</td><td class="${r.type==='expense'?'amount-expense':'amount-income'}">${r.type==='expense'?'−':'+'}${formatMoney(r.amount)}</td></tr>`;
+  }).join('');
+  const net = totalIn-totalOut;
+  tbody.innerHTML = rows+`<tr class="total-row"><td colspan="2">本月合計</td><td style="font-size:0.72rem;color:var(--ink-muted)">+${formatMoney(totalIn)} / −${formatMoney(totalOut)}</td><td class="${net>=0?'amount-income':'amount-expense'}">${net>=0?'+':'−'}${formatMoney(net)}</td></tr>`;
+}
+
+// ── Summary ────────────────────────────────────────────────────────────
+function updateSummary() {
+  const today = todayStr(); const thisMonth = today.slice(0,7);
+  const calc = rs => ({ in: rs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0), out: rs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0) });
+  const d = calc(records.filter(r=>r.date===today));
+  const m = calc(records.filter(r=>r.date.startsWith(thisMonth)));
+  [['daily',d],['monthly',m]].forEach(([prefix,x]) => {
+    const net = x.in-x.out;
+    const el = document.getElementById(prefix+'-net');
+    el.textContent = (net>=0?'+':'−')+formatMoney(net);
+    el.className = 'summary-net'+(net>0?' positive':net<0?' negative':'');
+    document.getElementById(prefix+'-in').textContent = '▲ '+formatMoney(x.in);
+    document.getElementById(prefix+'-out').textContent = '▼ '+formatMoney(x.out);
+  });
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    btn.classList.add('active');
+  });
+});
+
+// ── Edit modal ─────────────────────────────────────────────────────────
+document.getElementById('modal-close-btn').addEventListener('click', closeEditModal);
+document.getElementById('modal-cancel-btn').addEventListener('click', closeEditModal);
+document.getElementById('edit-modal').addEventListener('click', e => { if(e.target===document.getElementById('edit-modal')) closeEditModal(); });
+document.getElementById('edit-btn-expense').addEventListener('click', () => setEditType('expense'));
+document.getElementById('edit-btn-income').addEventListener('click', () => setEditType('income'));
+document.getElementById('modal-save-btn').addEventListener('click', saveEdit);
+
+function openEditModal(id) {
+  const r = records.find(x=>x.id===id);
+  if (!r) return;
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-amount').value = r.amount;
+  document.getElementById('edit-desc').value = r.desc;
+  document.getElementById('edit-date').value = r.date;
+  editType = r.type; editSelectedPay = '';
+  for (const p of [...EXPENSE_PAYS,...INCOME_PAYS]) {
+    if (r.pay===p.label || r.pay.startsWith(p.label+' ')) { editSelectedPay=p.id; break; }
+  }
+  if (editSelectedPay==='card') {
+    const parts = r.pay.replace('刷卡','').trim();
+    const m = parts.match(/\*(\d{1,4})$/);
+    document.getElementById('edit-card-bank').value = parts.replace(/\*\d{1,4}$/,'').trim();
+    document.getElementById('edit-card-last4').value = m?m[1]:'';
+  } else { document.getElementById('edit-card-bank').value=''; document.getElementById('edit-card-last4').value=''; }
+  renderEditTypeUI();
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function renderEditTypeUI() {
+  document.getElementById('edit-btn-expense').className = 'type-btn'+(editType==='expense'?' active-expense':'');
+  document.getElementById('edit-btn-income').className = 'type-btn'+(editType==='income'?' active-income':'');
+  document.getElementById('edit-payment-section').style.display = editType==='expense'?'':'none';
+  document.getElementById('edit-income-section').style.display = editType==='income'?'':'none';
+  renderEditPayChips();
+  document.getElementById('modal-card-detail').style.display = (editSelectedPay==='card'&&editType==='expense')?'grid':'none';
+}
+
+function setEditType(type) {
+  editType=type; editSelectedPay='';
+  document.getElementById('edit-card-bank').value=''; document.getElementById('edit-card-last4').value='';
+  renderEditTypeUI();
+}
+
+function renderEditPayChips() {
+  const pays = editType==='expense'?EXPENSE_PAYS:INCOME_PAYS;
+  const id = editType==='expense'?'edit-pay-chips':'edit-income-chips';
+  const c = document.getElementById(id);
+  if(!c) return;
+  c.innerHTML = pays.map(p=>`<div class="pay-chip${editSelectedPay===p.id?' selected':''}" data-pay="${p.id}">${p.label}</div>`).join('');
+  c.querySelectorAll('.pay-chip').forEach(el => el.addEventListener('click', () => {
+    editSelectedPay=el.dataset.pay; renderEditPayChips();
+    document.getElementById('modal-card-detail').style.display=(editSelectedPay==='card'&&editType==='expense')?'grid':'none';
+    if(editSelectedPay!=='card'){document.getElementById('edit-card-bank').value='';document.getElementById('edit-card-last4').value='';}
+  }));
+}
+
+function closeEditModal() { document.getElementById('edit-modal').classList.remove('open'); }
+
+async function saveEdit() {
+  const id = document.getElementById('edit-id').value;
+  const amount = parseFloat(document.getElementById('edit-amount').value);
+  const desc = document.getElementById('edit-desc').value.trim();
+  const date = document.getElementById('edit-date').value;
+  if (!amount||amount<=0) return showToast('請輸入有效金額');
+  if (!date) return showToast('請選擇日期');
+  if (!editSelectedPay) return showToast('請選擇付款/進帳方式');
+  const payLabel = buildPayLabel(editType, editSelectedPay,
+    document.getElementById('edit-card-bank').value.trim(),
+    document.getElementById('edit-card-last4').value.trim());
+  try {
+    await fsUpdate(id, { type:editType, amount, desc:desc||(editType==='expense'?'支出':'進帳'), date, pay:payLabel });
+    closeEditModal(); showToast('已更新 ✓');
+  } catch(e) { showToast('更新失敗'); }
+}
+</script>
+</body>
+</html>
