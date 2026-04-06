@@ -125,6 +125,12 @@
   .month-table tr:last-child td { border-bottom:none; }
   .month-table td:first-child { font-family:'Noto Sans TC',sans-serif; font-size:0.82rem; }
   .month-table .total-row td { font-weight:600; border-top:1px solid var(--paper-dark); padding-top:12px; }
+  .pagination { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-top:1px solid var(--paper-dark); }
+  .page-info { font-size:0.72rem; color:var(--ink-muted); font-family:'DM Mono',monospace; }
+  .page-btns { display:flex; gap:6px; }
+  .page-btn { padding:5px 12px; border:1px solid var(--paper-dark); border-radius:3px; background:var(--paper-warm); color:var(--ink-soft); font-size:0.75rem; cursor:pointer; font-family:'Noto Sans TC',sans-serif; transition:all 0.15s; }
+  .page-btn:hover:not(:disabled) { background:var(--paper-dark); }
+  .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
   /* Chart */
   .chart-wrap { padding:20px 22px; }
@@ -270,6 +276,13 @@
               <tbody id="month-tbody"></tbody>
             </table>
           </div>
+          <div class="pagination" id="month-pagination">
+            <span class="page-info" id="page-info"></span>
+            <div class="page-btns">
+              <button class="page-btn" id="page-prev">‹ 上一頁</button>
+              <button class="page-btn" id="page-next">下一頁 ›</button>
+            </div>
+          </div>
         </div>
 
         <div class="tab-content" id="chart-tab">
@@ -358,10 +371,14 @@ let currentUser = null, unsubscribeFs = null, records = [];
 let currentType = 'expense', selectedPay = '';
 let viewDate = todayStr(), viewMonth = todayStr().slice(0,7), chartMonth = todayStr().slice(0,7);
 let editType = 'expense', editSelectedPay = '';
+let monthPage = 1;
+const PAGE_SIZE = 15;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function todayStr() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-function formatDate(s) { const [y,m,d]=s.split('-'); return `${y}年${parseInt(m)}月${parseInt(d)}日`; }
+const WEEKDAYS=['日','一','二','三','四','五','六'];
+function formatDate(s) { const [y,m,d]=s.split('-'); const dt=new Date(Number(y),Number(m)-1,Number(d)); return `${y}年${parseInt(m)}月${parseInt(d)}日（${WEEKDAYS[dt.getDay()]}）`; }
+function formatDateShort(s) { const [y,m,d]=s.split('-'); const dt=new Date(Number(y),Number(m)-1,Number(d)); return `${parseInt(m)}/${parseInt(d)}（${WEEKDAYS[dt.getDay()]}）`; }
 function formatMoney(n) { return '$'+Math.abs(n).toLocaleString(); }
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function setSyncing(v) { document.getElementById('sync-dot').className='sync-dot'+(v?' syncing':''); document.getElementById('sync-label').textContent=v?'同步中…':'已同步'; }
@@ -502,13 +519,15 @@ document.getElementById('prev-month').addEventListener('click',()=>shiftMonth('v
 document.getElementById('next-month').addEventListener('click',()=>shiftMonth('view',1));
 document.getElementById('chart-prev-month').addEventListener('click',()=>shiftMonth('chart',-1));
 document.getElementById('chart-next-month').addEventListener('click',()=>shiftMonth('chart',1));
+document.getElementById('page-prev').addEventListener('click',()=>{if(monthPage>1){monthPage--;renderMonthTable();}});
+document.getElementById('page-next').addEventListener('click',()=>{monthPage++;renderMonthTable();});
 
 function shiftDate(d) { const [y,m,dy]=viewDate.split('-').map(Number); const dt=new Date(y,m-1,dy+d); viewDate=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; updateViewDateLabel(); renderLedger(); }
 function shiftMonth(which,d) {
   const cur=which==='view'?viewMonth:chartMonth;
   const [y,m]=cur.split('-').map(Number); const dt=new Date(y,m-1+d,1);
   const next=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
-  if(which==='view'){viewMonth=next;updateViewMonthLabel();renderMonthTable();}
+  if(which==='view'){viewMonth=next;monthPage=1;updateViewMonthLabel();renderMonthTable();}
   else{chartMonth=next;updateChartMonthLabel();renderChart();}
 }
 function updateViewDateLabel() { document.getElementById('view-date-label').textContent=formatDate(viewDate); }
@@ -538,17 +557,30 @@ function renderLedger() {
 // ── Month table ────────────────────────────────────────────────────────
 function renderMonthTable() {
   const tbody=document.getElementById('month-tbody');
-  const sorted=records.filter(r=>r.date.startsWith(viewMonth)).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!sorted.length){tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--ink-muted);padding:32px">本月尚無記錄</td></tr>`;return;}
+  const allSorted=records.filter(r=>r.date.startsWith(viewMonth)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!allSorted.length){tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--ink-muted);padding:32px">本月尚無記錄</td></tr>`;document.getElementById('month-pagination').style.display='none';return;}
+
+  const totalPages=Math.ceil(allSorted.length/PAGE_SIZE);
+  if(monthPage>totalPages) monthPage=totalPages;
+
+  const pageRecs=allSorted.slice((monthPage-1)*PAGE_SIZE, monthPage*PAGE_SIZE);
   let ti=0,to=0;
-  const rows=sorted.map(r=>{
-    if(r.type==='income')ti+=r.amount;else to+=r.amount;
-    const[,mo,dy]=r.date.split('-');
+  allSorted.forEach(r=>{if(r.type==='income')ti+=r.amount;else to+=r.amount;});
+
+  const rows=pageRecs.map(r=>{
     const badge=r.cat?`<span style="display:inline-block;background:${catColor(r.cat)};color:white;font-size:0.6rem;padding:1px 5px;border-radius:2px;font-family:'Noto Sans TC',sans-serif">${escHtml(r.cat)}</span>`:'—';
-    return `<tr><td>${parseInt(mo)}/${parseInt(dy)}</td><td style="font-family:'Noto Sans TC',sans-serif;font-size:0.78rem">${escHtml(r.desc)}</td><td>${badge}</td><td class="${r.type==='expense'?'amount-expense':'amount-income'}">${r.type==='expense'?'−':'+'}${formatMoney(r.amount)}</td></tr>`;
+    return `<tr><td style="white-space:nowrap">${formatDateShort(r.date)}</td><td style="font-family:'Noto Sans TC',sans-serif;font-size:0.78rem">${escHtml(r.desc)}</td><td>${badge}</td><td class="${r.type==='expense'?'amount-expense':'amount-income'}">${r.type==='expense'?'−':'+'}${formatMoney(r.amount)}</td></tr>`;
   }).join('');
+
   const net=ti-to;
-  tbody.innerHTML=rows+`<tr class="total-row"><td colspan="2">本月合計</td><td style="font-size:0.65rem;color:var(--ink-muted)">+${formatMoney(ti)} / −${formatMoney(to)}</td><td class="${net>=0?'amount-income':'amount-expense'}">${net>=0?'+':'−'}${formatMoney(net)}</td></tr>`;
+  const totalRow=monthPage===totalPages?`<tr class="total-row"><td colspan="2">本月合計</td><td style="font-size:0.65rem;color:var(--ink-muted)">+${formatMoney(ti)} / −${formatMoney(to)}</td><td class="${net>=0?'amount-income':'amount-expense'}">${net>=0?'+':'−'}${formatMoney(net)}</td></tr>`:'';
+  tbody.innerHTML=rows+totalRow;
+
+  const pagination=document.getElementById('month-pagination');
+  pagination.style.display=totalPages>1?'flex':'none';
+  document.getElementById('page-info').textContent=`第 ${monthPage} / ${totalPages} 頁（共 ${allSorted.length} 筆）`;
+  document.getElementById('page-prev').disabled=monthPage<=1;
+  document.getElementById('page-next').disabled=monthPage>=totalPages;
 }
 
 // ── Chart ──────────────────────────────────────────────────────────────
