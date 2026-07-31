@@ -142,6 +142,33 @@
   .leg-pct { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--ink-muted); }
   .chart-empty { padding:48px 22px; text-align:center; color:var(--ink-muted); font-size:0.82rem; line-height:1.8; }
 
+  /* Overview (multi-month summary) */
+  .overview-wrap { padding:18px 22px 20px; }
+  .ov-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+  .ov-range-btns { display:flex; gap:6px; }
+  .ov-range-btn { padding:5px 12px; border:1px solid var(--paper-dark); border-radius:3px; background:var(--paper-warm); color:var(--ink-soft); font-size:0.72rem; cursor:pointer; font-family:'Noto Sans TC',sans-serif; letter-spacing:0.04em; transition:all 0.15s; }
+  .ov-range-btn:hover { background:var(--paper-dark); }
+  .ov-range-btn.active { background:var(--accent); color:white; border-color:var(--accent); }
+  .ov-summary { font-size:0.78rem; color:var(--ink-soft); margin-bottom:14px; letter-spacing:0.03em; }
+  .ov-summary .positive { color:var(--green); }
+  .ov-summary .negative { color:var(--red); }
+  .ov-list { display:flex; flex-direction:column; gap:10px; }
+  .ov-row { display:grid; grid-template-columns:64px 1fr 200px; align-items:center; gap:14px; padding:10px 12px; background:var(--paper-warm); border-radius:3px; border:1px solid rgba(0,0,0,0.03); }
+  .ov-row.ov-current { outline:1.5px solid var(--gold); }
+  .ov-month { font-family:'DM Mono',monospace; font-size:0.8rem; color:var(--ink-soft); font-weight:500; }
+  .ov-bars { display:flex; flex-direction:column; gap:4px; }
+  .ov-bar-track { position:relative; height:7px; background:rgba(0,0,0,0.055); border-radius:4px; overflow:hidden; }
+  .ov-bar { height:100%; border-radius:4px; min-width:2px; transition:width 0.3s ease; }
+  .ov-bar-in { background:var(--green); }
+  .ov-bar-out { background:var(--red); }
+  .ov-figures { display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-family:'DM Mono',monospace; }
+  .ov-figures .breakdown-in,.ov-figures .breakdown-out { font-size:0.68rem; }
+  .ov-net { font-size:0.86rem; font-weight:600; color:var(--ink); }
+  .ov-net.positive { color:var(--green); }
+  .ov-net.negative { color:var(--red); }
+  .ov-empty { padding:40px 22px; text-align:center; color:var(--ink-muted); font-size:0.82rem; letter-spacing:0.06em; }
+  @media (max-width:560px) { .ov-row { grid-template-columns:1fr; gap:6px; } .ov-figures { flex-direction:row; align-items:center; justify-content:space-between; } }
+
   /* Modal */
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(26,18,9,0.6); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
   .modal-overlay.open { display:flex; }
@@ -252,6 +279,7 @@
           <button class="tab-btn active" data-tab="daily-tab">明細帳</button>
           <button class="tab-btn" data-tab="monthly-tab">月報表</button>
           <button class="tab-btn" data-tab="chart-tab">圖表分析</button>
+          <button class="tab-btn" data-tab="overview-tab">歷月總覽</button>
         </div>
 
         <div class="tab-content active" id="daily-tab">
@@ -292,6 +320,20 @@
             <button id="chart-next-month">›</button>
           </div>
           <div class="chart-wrap" id="chart-area"></div>
+        </div>
+
+        <div class="tab-content" id="overview-tab">
+          <div class="overview-wrap">
+            <div class="ov-toolbar">
+              <div class="ov-range-btns" id="ov-range-btns">
+                <div class="ov-range-btn" data-range="3">近 3 個月</div>
+                <div class="ov-range-btn active" data-range="6">近 6 個月</div>
+                <div class="ov-range-btn" data-range="12">近 12 個月</div>
+              </div>
+            </div>
+            <div id="ov-summary" class="ov-summary"></div>
+            <div id="ov-list" class="ov-list"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -371,7 +413,7 @@ let currentUser = null, unsubscribeFs = null, records = [];
 let currentType = 'expense', selectedPay = '';
 let viewDate = todayStr(), viewMonth = todayStr().slice(0,7), chartMonth = todayStr().slice(0,7);
 let editType = 'expense', editSelectedPay = '';
-let monthPage = 1;
+let monthPage = 1, ovRange = 6;
 const PAGE_SIZE = 15;
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -440,7 +482,7 @@ function subscribeRecords() {
   const q = query(collection(db, `users/${currentUser.uid}/records`), orderBy('date','desc'));
   unsubscribeFs = onSnapshot(q, snap => {
     records = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-    renderLedger(); renderMonthTable(); renderChart(); updateSummary();
+    renderLedger(); renderMonthTable(); renderChart(); renderOverview(); updateSummary();
     renderCatTags('cat-input','cat-tags');
     setSyncing(false);
   }, err => { console.error(err); setSyncing(false); showToast('同步失敗，請檢查網路'); });
@@ -617,6 +659,54 @@ function renderChart() {
   area.innerHTML=`<div class="pie-container">${svg}<div class="legend">${legend}</div></div>`;
 }
 
+// ── Overview (recent months) ──────────────────────────────────────────
+function renderOverview() {
+  const summaryEl=document.getElementById('ov-summary'), listEl=document.getElementById('ov-list');
+  if(!summaryEl||!listEl) return;
+  const n=ovRange;
+  const todayKey=todayStr().slice(0,7);
+  const now=new Date();
+  const months=[];
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  const data=months.map(m=>{
+    const list=records.filter(r=>r.date.startsWith(m));
+    const inc=list.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+    const out=list.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+    return {month:m, inc, out, net:inc-out, count:list.length};
+  });
+  const withData=data.filter(d=>d.count>0);
+  if(!withData.length){
+    summaryEl.innerHTML='';
+    listEl.innerHTML='<div class="ov-empty">這段期間尚無記錄</div>';
+    return;
+  }
+  const maxAbs=Math.max(1,...data.map(d=>Math.max(d.inc,d.out)));
+  const totalIn=data.reduce((s,d)=>s+d.inc,0), totalOut=data.reduce((s,d)=>s+d.out,0);
+  const totalNet=totalIn-totalOut, avgNet=totalNet/n;
+  summaryEl.innerHTML=`近 ${n} 個月合計 <span class="breakdown-in" style="font-family:'DM Mono',monospace">▲ ${formatMoney(totalIn)}</span> ／ <span class="breakdown-out" style="font-family:'DM Mono',monospace">▼ ${formatMoney(totalOut)}</span> ，平均每月結餘 <span class="${avgNet>=0?'positive':'negative'}" style="font-family:'DM Mono',monospace;font-weight:600">${avgNet>=0?'+':'−'}${formatMoney(avgNet)}</span>`;
+  listEl.innerHTML=data.map(d=>{
+    const [y,mm]=d.month.split('-');
+    const label=`${y}/${parseInt(mm)}`;
+    const incW=Math.round(d.inc/maxAbs*100), outW=Math.round(d.out/maxAbs*100);
+    const isCurrent=d.month===todayKey;
+    return `<div class="ov-row${isCurrent?' ov-current':''}">
+      <div class="ov-month">${label}</div>
+      <div class="ov-bars">
+        <div class="ov-bar-track"><div class="ov-bar ov-bar-in" style="width:${incW}%"></div></div>
+        <div class="ov-bar-track"><div class="ov-bar ov-bar-out" style="width:${outW}%"></div></div>
+      </div>
+      <div class="ov-figures">
+        <span class="breakdown-in">▲ ${formatMoney(d.inc)}</span>
+        <span class="breakdown-out">▼ ${formatMoney(d.out)}</span>
+        <span class="ov-net ${d.net>=0?'positive':d.net<0?'negative':''}">${d.net>=0?'+':'−'}${formatMoney(d.net)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // ── Summary ────────────────────────────────────────────────────────────
 function updateSummary() {
   const today=todayStr(),tm=today.slice(0,7);
@@ -639,6 +729,15 @@ document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',
   document.getElementById(btn.dataset.tab).classList.add('active');
   btn.classList.add('active');
   if(btn.dataset.tab==='chart-tab') renderChart();
+  if(btn.dataset.tab==='overview-tab') renderOverview();
+}));
+
+// ── Overview range switch ────────────────────────────────────────────
+document.getElementById('ov-range-btns').querySelectorAll('.ov-range-btn').forEach(b=>b.addEventListener('click',()=>{
+  ovRange=parseInt(b.dataset.range,10);
+  document.getElementById('ov-range-btns').querySelectorAll('.ov-range-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  renderOverview();
 }));
 
 // ── Edit modal ─────────────────────────────────────────────────────────
