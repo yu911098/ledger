@@ -135,11 +135,23 @@
   /* Chart */
   .chart-wrap { padding:20px 22px; }
   .pie-container { display:flex; align-items:center; gap:28px; flex-wrap:wrap; justify-content:center; }
-  .legend { display:flex; flex-direction:column; gap:10px; min-width:150px; }
-  .leg-item { display:flex; align-items:center; gap:9px; }
+  .legend { display:flex; flex-direction:column; gap:6px; min-width:190px; }
+  .leg-group { border-radius:3px; }
+  .leg-item { display:flex; align-items:center; gap:9px; cursor:pointer; padding:5px 6px; border-radius:3px; transition:background 0.12s; }
+  .leg-item:hover { background:rgba(0,0,0,0.04); }
   .leg-dot { width:10px;height:10px; border-radius:2px; flex-shrink:0; }
-  .leg-name { font-size:0.78rem; color:var(--ink); }
-  .leg-pct { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--ink-muted); }
+  .leg-item-main { flex:1; display:flex; align-items:baseline; justify-content:space-between; gap:8px; min-width:0; }
+  .leg-name { font-size:0.78rem; color:var(--ink); display:flex; align-items:center; gap:5px; }
+  .leg-caret { font-size:0.6rem; color:var(--ink-muted); transition:transform 0.15s; display:inline-block; }
+  .leg-group.open .leg-caret { transform:rotate(90deg); }
+  .leg-pct { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--ink-muted); white-space:nowrap; }
+  .leg-detail { display:none; margin:2px 4px 6px 25px; padding-left:10px; border-left:2px solid var(--paper-dark); }
+  .leg-group.open .leg-detail { display:block; }
+  .leg-detail-row { display:flex; align-items:baseline; gap:8px; font-size:0.68rem; padding:3px 0; color:var(--ink-soft); }
+  .leg-detail-date { font-family:'DM Mono',monospace; color:var(--ink-muted); flex-shrink:0; }
+  .leg-detail-desc { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .leg-detail-amt { font-family:'DM Mono',monospace; color:var(--red); flex-shrink:0; }
+  .leg-detail-empty { font-size:0.68rem; color:var(--ink-muted); padding:4px 0; }
   .chart-empty { padding:48px 22px; text-align:center; color:var(--ink-muted); font-size:0.82rem; line-height:1.8; }
 
   /* Overview (multi-month summary) */
@@ -652,11 +664,28 @@ function renderChart() {
     <text x="${cx}" y="${cy+5}" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="12" font-weight="600" fill="#1a1209">${escHtml(top[0])}</text>
     <text x="${cx}" y="${cy+19}" text-anchor="middle" font-family="DM Mono,monospace" font-size="11" fill="#8b4513">${topPct}%</text>
   </svg>`;
-  const legend=sorted.map(([cat,amt])=>`<div class="leg-item">
-    <div class="leg-dot" style="background:${catColor(cat)}"></div>
-    <div><div class="leg-name">${escHtml(cat)}</div><div class="leg-pct">${formatMoney(amt)} · ${Math.round(amt/grand*100)}%</div></div>
-  </div>`).join('');
+  const legend=sorted.map(([cat,amt])=>{
+    const catRecs=expenses.filter(r=>r.cat===cat).sort((a,b)=>b.date.localeCompare(a.date)||((b.createdAt||0)-(a.createdAt||0)));
+    const detailRows=catRecs.map(r=>`<div class="leg-detail-row">
+        <span class="leg-detail-date">${formatDateShort(r.date)}</span>
+        <span class="leg-detail-desc">${escHtml(r.desc)}</span>
+        <span class="leg-detail-amt">−${formatMoney(r.amount)}</span>
+      </div>`).join('') || '<div class="leg-detail-empty">無明細</div>';
+    return `<div class="leg-group" data-cat="${escHtml(cat)}">
+      <div class="leg-item">
+        <div class="leg-dot" style="background:${catColor(cat)}"></div>
+        <div class="leg-item-main">
+          <div class="leg-name">${escHtml(cat)}<span class="leg-caret">›</span></div>
+          <div class="leg-pct">${formatMoney(amt)} · ${Math.round(amt/grand*100)}%</div>
+        </div>
+      </div>
+      <div class="leg-detail">${detailRows}</div>
+    </div>`;
+  }).join('');
   area.innerHTML=`<div class="pie-container">${svg}<div class="legend">${legend}</div></div>`;
+  area.querySelectorAll('.leg-item').forEach(item=>{
+    item.addEventListener('click',()=>item.closest('.leg-group').classList.toggle('open'));
+  });
 }
 
 // ── Overview (recent months) ──────────────────────────────────────────
